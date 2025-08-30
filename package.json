@@ -2,11 +2,9 @@
   "name": "bridgebedrock",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "scripts": { "start": "node index.js" },
   "dependencies": {
-    "bedrock-portal": "^1.1.0",
-    "bedrock-protocol": "^3.42.3"
+    "bedrock-portal": "latest",
+    "bedrock-protocol": "latest"
   }
 }
