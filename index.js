@@ -1,67 +1,47 @@
-// index.js
-const { BedrockPortal, Joinability } = require('bedrock-portal');
+const { BedrockPortal, Joinability, Modules } = require('bedrock-portal');
 
-const TARGET_IP   = process.env.TARGET_IP || "";
-const TARGET_PORT = parseInt(process.env.TARGET_PORT || "19132", 10);
-const JOIN        = process.env.JOINABILITY || "FriendsOfFriends";
+const TARGET_IP     = process.env.TARGET_IP || "";
+const TARGET_PORT   = parseInt(process.env.TARGET_PORT || "19132", 10);
+const JOIN          = process.env.JOINABILITY || "FriendsOfFriends";
+const REALM_INVITE  = (process.env.REALM_INVITE || "").trim(); // ej. ABCDE
 
-// Validación básica de config
-function requireEnv(name, value) {
-  if (!value) {
-    console.error(`❌ Faltó la variable de entorno ${name}. Configúrala en Render → Environment.`);
-    process.exit(1);
-  }
-}
-requireEnv("TARGET_IP", TARGET_IP);
+function need(name, v){ if(!v){ console.error(`❌ Falta ${name}.`); process.exit(1); } }
+need("TARGET_IP", TARGET_IP);
+need("REALM_INVITE", REALM_INVITE);
 
-// Mapea el string a enum seguro
-const JOINABILITY_SAFE = Joinability[JOIN] ?? Joinability.FriendsOfFriends;
+const JOIN_SAFE = Joinability[JOIN] ?? Joinability.FriendsOfFriends;
 
 (async () => {
   try {
     const portal = new BedrockPortal({
       ip: TARGET_IP,
       port: TARGET_PORT,
-      joinability: JOINABILITY_SAFE,
-
-      // ✅ Auto-aceptar invitaciones y amigos
+      joinability: JOIN_SAFE,
       autoAcceptFriendRequests: true,
-      autoAcceptRealmInvites: true,
+      autoAcceptRealmInvites: true
+    });
 
-      // Opcional: muestra formularios/listas si usas features extra
-      showServerListForm: false,
-      autoInviteOnCommand: true,
+    // 🔗 Escucha tu Realm y manda invitación al portal
+    portal.use(Modules.RedirectFromRealm, {
+      clientOptions: {
+        realms: { realmInvite: REALM_INVITE } // ← código tipo ABCDE
+      },
+      // También puedes pedir la invitación escribiendo "invite" en el chat del Realm
+      chatCommand: { enabled: true, message: "invite", cooldown: 10000 }
     });
 
     // Logs útiles
-    portal.on('log', (msg) => console.log('[portal]', msg));
-    portal.on('playerCount', (n) => console.log(`👥 Jugadores redirigidos: ${n}`));
-    portal.on('error', (err) => console.error('🔥 Error del portal:', err));
+    portal.on('log', (m) => console.log('[portal]', m));
+    portal.on('playerJoin', (p) => console.log('👤 Se unió al portal:', p?.gamertag));
+    portal.on('error', (e) => console.error('🔥 Error:', e));
 
     console.log('🔌 Iniciando Bedrock Portal…');
     await portal.start();
-
-    console.log(`✅ Bedrock Portal activo → ${TARGET_IP}:${TARGET_PORT}`);
-    console.log(`🔐 Joinability: ${JOINABILITY_SAFE === Joinability.FriendsOfFriends ? 'FriendsOfFriends' :
-                                   JOINABILITY_SAFE === Joinability.InviteOnly ? 'InviteOnly' : 'Public'}`);
-    console.log('💡 Tip: invita la cuenta del bot a tu Realm; con autoAcceptRealmInvites se unirá solo.');
-
-    // Apagado limpio
-    const shutdown = async (sig) => {
-      try {
-        console.log(`\n⚠️ Recibida señal ${sig}. Cerrando portal…`);
-        await portal.stop?.();
-      } catch (e) {
-        console.error('Error al cerrar:', e);
-      } finally {
-        process.exit(0);
-      }
-    };
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
-
-  } catch (err) {
-    console.error('❌ No se pudo iniciar el portal:', err);
+    console.log(`✅ Portal activo → ${TARGET_IP}:${TARGET_PORT}`);
+    console.log('💡 Al entrar al Realm recibirás una INVITACIÓN para saltar al server.');
+    console.log('✍️ También puedes escribir "invite" en el chat del Realm para forzarla.');
+  } catch (e) {
+    console.error('❌ No se pudo iniciar:', e);
     process.exit(1);
   }
 })();
